@@ -64,7 +64,7 @@ export class DynamicDatabaseService implements OnModuleDestroy {
           Nombre as nombre,
           URL as url,
           Correo as correo
-        FROM Departamentos
+        FROM Departamento
         WHERE URL IS NOT NULL AND URL != ''
       `);
     
@@ -83,7 +83,7 @@ export class DynamicDatabaseService implements OnModuleDestroy {
           Nombre as nombre,
           URL as url,
           Correo as correo
-        FROM Departamentos
+        FROM Departamento
         WHERE ClaveDepartamento = @ClaveDepartamento 
           AND URL IS NOT NULL AND URL != ''
       `);
@@ -103,7 +103,7 @@ export class DynamicDatabaseService implements OnModuleDestroy {
           Nombre as nombre,
           URL as url,
           Correo as correo
-        FROM Departamentos
+        FROM Departamento
         WHERE Nombre = @Nombre 
           AND URL IS NOT NULL AND URL != ''
       `);

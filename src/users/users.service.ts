@@ -17,7 +17,7 @@ export class UsersService {
     const result = await pool
       .request()
       .input('Correo', email)
-      .query(`SELECT * FROM Usuarios WHERE Correo = @Correo`);
+      .query(`SELECT * FROM Usuario WHERE Correo = @Correo`);
     
     return result.recordset[0] || null;
   }
@@ -27,7 +27,7 @@ export class UsersService {
     const result = await pool
       .request()
       .input('ClaveUsuario', claveUsuario)
-      .query(`SELECT * FROM Usuarios WHERE ClaveUsuario = @ClaveUsuario`);
+      .query(`SELECT * FROM Usuario WHERE ClaveUsuario = @ClaveUsuario`);
     
     return result.recordset[0] || null;
   }
@@ -49,14 +49,14 @@ export class UsersService {
 
     await request
       .input('ClaveUsuario', claveUsuario)
-      .query(`UPDATE Usuarios SET ${setSql} WHERE ClaveUsuario = @ClaveUsuario`);
+      .query(`UPDATE Usuario SET ${setSql} WHERE ClaveUsuario = @ClaveUsuario`);
     
     return this.findByClaveUsuario(claveUsuario);
   }
   
   async getAll() {
     const pool = this.mssql.getPool();
-    const result = await pool.request().query(`SELECT * FROM Usuarios`);
+    const result = await pool.request().query(`SELECT * FROM Usuario`);
     
     return result.recordset;
   }
@@ -67,7 +67,7 @@ export class UsersService {
   async findByEmailInDepartment(email: string, claveDepartamento: string) {
     const results = await this.dynamicDb.executeQueryByDepartmentId(
       claveDepartamento,
-      `SELECT * FROM Usuarios WHERE Correo = @Correo`,
+      `SELECT * FROM Usuario WHERE Correo = @Correo`,
       [{ name: 'Correo', value: email }]
     );
     
@@ -78,7 +78,7 @@ export class UsersService {
   async findByClaveUsuarioInDepartment(claveUsuario: string, claveDepartamento: string) {
     const results = await this.dynamicDb.executeQueryByDepartmentId(
       claveDepartamento,
-      `SELECT * FROM Usuarios WHERE ClaveUsuario = @ClaveUsuario`,
+      `SELECT * FROM Usuario WHERE ClaveUsuario = @ClaveUsuario`,
       [{ name: 'ClaveUsuario', value: claveUsuario }]
     );
     
@@ -94,7 +94,7 @@ export class UsersService {
       try {
         const users = await this.dynamicDb.executeQueryByDepartmentId(
           dept.claveDepartamento,
-          'SELECT * FROM Usuarios'
+          'SELECT * FROM Usuario'
         );
         
         allUsers.push({
