@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MssqlService } from '@strongnguyen/nestjs-mssql';
 import { DynamicDatabaseService } from '../database/dynamic-database.service';
 import { UsersService } from '../users/users.service';
+import { ActivitiesService } from '../activities/activities.service';
 
 @Injectable()
 export class FilesService {
@@ -11,6 +12,7 @@ export class FilesService {
     private readonly mssql: MssqlService,
     private readonly dynamicDb: DynamicDatabaseService,
     private readonly usersService: UsersService,
+    private readonly activitiesService: ActivitiesService,
   ) {}
 
   async generateFiles(claveUsuario: string) {
@@ -34,7 +36,85 @@ export class FilesService {
     }
   }
 
+  /**
+   * Generar documentos por actividad del docente
+   * @param claveDocente: string
+   */
+  async getFilesByActivity(claveDocente: string) {
+    const activities = await this.activitiesService.getAllActivities();
+    const generationMethods = {
+      'DOC033': this.generateDOC033.bind(this),
+      'DOC034': this.generateDOC034.bind(this),
+      'DOC035': this.generateDOC035.bind(this),
+      'DOC036': this.generateDOC036.bind(this),
+      'DOC037': this.generateDOC037.bind(this),
+      'DOC038': this.generateDOC038.bind(this),
+      'DOC039': this.generateDOC039.bind(this),
+      'DOC040': this.generateDOC040.bind(this),
+      'DOC041': this.generateDOC041.bind(this),
+      'DOC042': this.generateDOC042.bind(this),
+      'DOC043': this.generateDOC043.bind(this),
+      'DOC044': this.generateDOC044.bind(this),
+      'DOC045': this.generateDOC045.bind(this),
+      'DOC046': this.generateDOC046.bind(this),
+      'DOC047': this.generateDOC047.bind(this),
+      'DOC048': this.generateDOC048.bind(this),
+      'DOC049': this.generateDOC049.bind(this),
+      'DOC050': this.generateDOC050.bind(this),
+      'DOC051': this.generateDOC051.bind(this),
+      'DOC052': this.generateDOC052.bind(this),
+      'DOC053': this.generateDOC053.bind(this),
+      'DOC054': this.generateDOC054.bind(this),
+      'DOC055': this.generateDOC055.bind(this),
+      'DOC056': this.generateDOC056.bind(this),
+      'DOC057': this.generateDOC057.bind(this),
+      'DOC058': this.generateDOC058.bind(this),
+      'DOC059': this.generateDOC059.bind(this),
+      'DOC060': this.generateDOC060.bind(this),
+      'DOC061': this.generateDOC061.bind(this),
+      'DOC062': this.generateDOC062.bind(this),
+      'DOC063': this.generateDOC063.bind(this),
+    }
+
+    for (const a of activities) {
+      this.logger.log(`Generando documento para actividad: ${a.ClaveActividad}`);
+
+      const files = await this.activitiesService.getDocumentsByActivity(a.ClaveActividad);
+
+      for (const f of files) {
+        const claveDepartamento = f.departamento ?? await this.getDepartmentId(claveDocente);
+        const año = new Date().getFullYear();
+        const generator = generationMethods[f.documento];
+        if (generator) {
+          await generator(
+            claveDocente,
+            año,
+            claveDepartamento
+          )
+        }
+      }
+    }
+  }
+
   // ========== MÉTODOS AUXILIARES ==========
+  /**
+   * Obtener clave de docente por clave de usuario
+   * @param claveUsuario: string
+   */
+  async getProfessorId(claveUsuario: string) {
+    const pool = this.mssql.getPool();
+    const result = await pool 
+      .request()
+      .input('ClaveUsuario', claveUsuario)
+      .query(`
+        SELECT ClaveDocente AS claveDocente
+        FROM Usuario
+        WHERE ClaveUsuario = @ClaveUsuario
+      `)
+
+    return result.recordset[0]?.claveDocente || null;
+  }
+
   /**
    * Obtener titular de departamento
    * @param claveDepartamento: string
@@ -116,7 +196,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc033(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC033(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento,
@@ -147,7 +227,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc034(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC034(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         e.NombreConcurso [NOMBRE_EVENTO], 
@@ -179,7 +259,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc035(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC035(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento, 
@@ -211,7 +291,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc036(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC036(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         e.NombreConcurso AS nombreConcurso, 
@@ -243,7 +323,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc037(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC037(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento,
@@ -274,7 +354,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc038(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC038(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         e.NombreConcurso AS nombreConcurso,
@@ -314,7 +394,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc039(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC039(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento,
@@ -345,7 +425,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc040(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC040(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento,
@@ -375,7 +455,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc041(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC041(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT
         CASE 
@@ -409,7 +489,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc042(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC042(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         ce.Tipo AS tipo,
@@ -438,7 +518,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc043(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC043(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT a.TipoSistema AS tipoSistema
       FROM Auditoria a
@@ -465,7 +545,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc044(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC044(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         a.FuncionDocente AS funcionDocente,
@@ -497,7 +577,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc045(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC045(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         ep.FechaInicio AS fechaInicio,
@@ -526,7 +606,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc046(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC046(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         p.NombrePrograma AS nombrePrograma,
@@ -558,7 +638,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc047(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC047(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
     SELECT 
       p.NombrePrograma AS nombrePrograma,
@@ -591,7 +671,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc048(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC048(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         p.NombrePrograma AS nombrePrograma,
@@ -622,7 +702,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc049(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC049(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         STRING_AGG(lm.NombreModulo, ', ') AS modulos,
@@ -656,7 +736,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc050(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC050(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         STRING_AGG(lm.NombreModulo, ', ') AS modulos,
@@ -690,7 +770,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc051(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC051(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         ap.NombrePrograma AS nombrePrograma,
@@ -721,7 +801,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc052(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC052(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
     SELECT 
       ap.NombrePrograma AS nombrePrograma,
@@ -760,7 +840,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc053(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC053(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         ap.NombrePrograma AS nombrePrograma,
@@ -792,7 +872,7 @@ export class FilesService {
    * @param claveDocente: string
    * @param claveDepartamento: string
    */
-  async generateDoc054(claveDocente: string, claveDepartamento: string) {
+  async generateDOC054(claveDocente: string, claveDepartamento: string) {
     const query = `
       SELECT 
         d.RFC AS rfc,
@@ -823,7 +903,7 @@ export class FilesService {
    * @param claveDocente: string
    * @param claveDepartamento: string
    */
-  async generateDoc055(claveDocente: string, claveDepartamento: string) {
+  async generateDOC055(claveDocente: string, claveDepartamento: string) {
     const query = `
       SELECT 
         d.RFC AS rfc,
@@ -850,7 +930,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc056(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC056(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         pi.NombreProyecto AS nombreProyecto,
@@ -878,7 +958,7 @@ export class FilesService {
    * @param claveDocente: string
    * @param claveDepartamento: string
    */
-  async generateDoc057(claveDocente: string, claveDepartamento: string) {
+  async generateDOC057(claveDocente: string, claveDepartamento: string) {
     const query = `
       SELECT
         d.CVUEstado [CVU_ESTADO]
@@ -904,7 +984,7 @@ export class FilesService {
    * @param claveDocente: string
    * @param claveDepartamento: string
    */
-  async generateDoc058(claveDocente: string, claveDepartamento: string) {
+  async generateDOC058(claveDocente: string, claveDepartamento: string) {
     const query = `
       SELECT 
         le.TipoLicencia [TIPO_LICENCIA],
@@ -934,7 +1014,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc059(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC059(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         Año as año,
@@ -971,7 +1051,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc060(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC060(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         Año as año,
@@ -1003,28 +1083,37 @@ export class FilesService {
    * DOC061: Evaluación departamental nivel licenciatura
    * @param claveDocente: string
    * @param año: number
-   * @param semestre: string
    * @param claveDepartamento: string
    */
-  async generateDoc061(claveDocente: string, año: number, semestre: string, claveDepartamento: string) {
-    const query = `
-      SELECT 
-        Año AS año,
-        Semestre AS semestre,
-        Calificacion AS calificacion
-      FROM EvaluacionDepartamental
-      WHERE ClaveDocente = @ClaveDocente
-        AND Año = @Año
-        AND Semestre = @Semestre
-    `
+  async generateDOC061(claveDocente: string, año: number, claveDepartamento: string) {
+    const semesters = ['AGOSTO-DICIEMBRE', 'ENERO-JUNIO'];
+    const result: any[] = [];
 
-    const result = await this.dynamicDb.executeQueryByDepartmentId(
-      claveDepartamento,
-      query,
-      [{name: 'ClaveDocente', value: claveDocente},
-       {name: 'Año', value: año},
-       {name: 'Semestre', value: semestre}]
-    )
+    for (const s of semesters) {
+      if (await this.isPostgraduateOnly(claveDocente, año, s))
+          continue;
+      
+      const query = `
+        SELECT 
+          Año AS año,
+          Semestre AS semestre,
+          Calificacion AS calificacion
+        FROM EvaluacionDepartamental
+        WHERE ClaveDocente = @ClaveDocente
+          AND Año = @Año
+          AND Semestre = @Semestre
+      `
+
+      const r = await this.dynamicDb.executeQueryByDepartmentId(
+        claveDepartamento,
+        query,
+        [{name: 'ClaveDocente', value: claveDocente},
+        {name: 'Año', value: año},
+        {name: 'Semestre', value: s}]
+      )
+
+      if (r) result.push(r[0]);
+    }
 
     return (result.length === 0 ? null : {
       evaluaciones: result,
@@ -1036,29 +1125,37 @@ export class FilesService {
    * DOC062: Evaluación departamental nivel posgrado
    * @param claveDocente: string
    * @param año: number
-   * @param semestre: string
    * @param claveDepartamento: string
    */
-  async generateDoc062(claveDocente: string, año: number, semestre: string, claveDepartamento: string) {
-    const query = `
-      SELECT 
-        Año AS año,
-        Semestre AS semestre,
-        Calificacion AS calificacion
-      FROM EvaluacionDepartamental
-      WHERE ClaveDocente = @ClaveDocente
-        AND Año = @Año
-        AND Semestre = @Semestre
-    `
+  async generateDOC062(claveDocente: string, año: number, claveDepartamento: string) {
+    const semesters = ['AGOSTO-DICIEMBRE', 'ENERO-JUNIO'];
+    const result: any[] = [];
 
-    const result = await this.dynamicDb.executeQueryByDepartmentId(
-      claveDepartamento,
-      query,
-      [{name: 'ClaveDocente', value: claveDocente},
-       {name: 'Año', value: año},
-       {name: 'Semestre', value: semestre}]
-    )
+    for (const s of semesters) {
+      if (!(await this.isPostgraduateOnly(claveDocente, año, s)))
+          continue;
+      
+      const query = `
+        SELECT 
+          Año AS año,
+          Semestre AS semestre,
+          Calificacion AS calificacion
+        FROM EvaluacionDepartamental
+        WHERE ClaveDocente = @ClaveDocente
+          AND Año = @Año
+          AND Semestre = @Semestre
+      `
 
+      const r = await this.dynamicDb.executeQueryByDepartmentId(
+        claveDepartamento,
+        query,
+        [{name: 'ClaveDocente', value: claveDocente},
+        {name: 'Año', value: año},
+        {name: 'Semestre', value: s}]
+      )
+
+      if (r) result.push(r[0]);
+    }
 
     return (result.length === 0 ? null : {
       evaluaciones: result,
@@ -1072,7 +1169,7 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDoc063(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateDOC063(claveDocente: string, año: number, claveDepartamento: string) {
     const query = `
       SELECT 
         Año AS AS año,

@@ -7,14 +7,14 @@ export class ActivitiesService {
         private readonly mssql: MssqlService,
     ) {}
 
-    async getActivityById(activityID: string) {
+    async getActivityById(claveActividad: string) {
         const pool = this.mssql.getPool();
         const result = await pool
             .request()
-            .input('ClaveActividad', activityID)
+            .input('ClaveActividad', claveActividad)
             .query(`SELECT * FROM Actividad WHERE ClaveActividad = @ClaveActividad`);
 
-        return result.recordset[0] || null;
+        return result.recordset || null;
     }
 
     async getAllActivities() {
@@ -22,7 +22,20 @@ export class ActivitiesService {
         const result = await pool
             .request()
             .query(`SELECT * FROM Actividad`);
-            
+
         return result.recordset;
+    }
+
+    async getDocumentsByActivity(claveActividad: string) {
+        const pool = this.mssql.getPool();
+        const result = await pool
+            .request()
+            .input('ClaveActividad', claveActividad)
+            .query(`SELECT * FROM Actividad_Documento WHERE ClaveActividad = @ClaveActividad`);  
+            
+        return result.recordset.map(row => ({
+            documento: row.ClaveDocumento,
+            departamento: row.ClaveDepartamento
+        }));
     }
 }
