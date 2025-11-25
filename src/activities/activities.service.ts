@@ -23,10 +23,10 @@ export class ActivitiesService {
             .request()
             .query(`SELECT * FROM Actividad`);
 
-        return result.recordset;
+        return result.recordset || null;
     }
 
-    async getDocumentsByActivity(claveActividad: string) {
+    async getDocumentsByActivity(claveActividad: string)  {
         const pool = this.mssql.getPool();
         const result = await pool
             .request()

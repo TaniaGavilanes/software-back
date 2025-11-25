@@ -3,6 +3,14 @@ import { MssqlService } from '@strongnguyen/nestjs-mssql';
 import { DynamicDatabaseService } from '../database/dynamic-database.service';
 import { UsersService } from '../users/users.service';
 import { ActivitiesService } from '../activities/activities.service';
+import * as DocumentInterfaces from './interfaces/files.interface';
+
+interface Expediente {
+  claveExpediente: string;
+  añoGeneracion: string;
+  claveDocente: string;
+  documentos: DocumentInterfaces.DocumentoGenerado[];
+}
 
 @Injectable()
 export class FilesService {
@@ -36,67 +44,26 @@ export class FilesService {
     }
   }
 
+  // ========== MÉTODOS AUXILIARES ==========
   /**
-   * Generar documentos por actividad del docente
-   * @param claveDocente: string
+   * Obtener documentos por clave de departamento
+   * @param claveDepartamento: string
    */
-  async getFilesByActivity(claveDocente: string) {
-    const activities = await this.activitiesService.getAllActivities();
-    const generationMethods = {
-      'DOC033': this.generateDOC033.bind(this),
-      'DOC034': this.generateDOC034.bind(this),
-      'DOC035': this.generateDOC035.bind(this),
-      'DOC036': this.generateDOC036.bind(this),
-      'DOC037': this.generateDOC037.bind(this),
-      'DOC038': this.generateDOC038.bind(this),
-      'DOC039': this.generateDOC039.bind(this),
-      'DOC040': this.generateDOC040.bind(this),
-      'DOC041': this.generateDOC041.bind(this),
-      'DOC042': this.generateDOC042.bind(this),
-      'DOC043': this.generateDOC043.bind(this),
-      'DOC044': this.generateDOC044.bind(this),
-      'DOC045': this.generateDOC045.bind(this),
-      'DOC046': this.generateDOC046.bind(this),
-      'DOC047': this.generateDOC047.bind(this),
-      'DOC048': this.generateDOC048.bind(this),
-      'DOC049': this.generateDOC049.bind(this),
-      'DOC050': this.generateDOC050.bind(this),
-      'DOC051': this.generateDOC051.bind(this),
-      'DOC052': this.generateDOC052.bind(this),
-      'DOC053': this.generateDOC053.bind(this),
-      'DOC054': this.generateDOC054.bind(this),
-      'DOC055': this.generateDOC055.bind(this),
-      'DOC056': this.generateDOC056.bind(this),
-      'DOC057': this.generateDOC057.bind(this),
-      'DOC058': this.generateDOC058.bind(this),
-      'DOC059': this.generateDOC059.bind(this),
-      'DOC060': this.generateDOC060.bind(this),
-      'DOC061': this.generateDOC061.bind(this),
-      'DOC062': this.generateDOC062.bind(this),
-      'DOC063': this.generateDOC063.bind(this),
-    }
+  async getDocumentsByDepartment(claveDepartamento: string) {
+    const pool = this.mssql.getPool();
+    const result = await pool
+      .request()
+      .input('ClaveDepartamento', claveDepartamento)
+      .query(`
+        SELECT ClaveDocumento as claveDocumento
+        FROM Actividad_Documento
+        WHERE ClaveDepartamento = @ClaveDepartamento 
+          OR ClaveDepartamento IS NULL
+        `)
 
-    for (const a of activities) {
-      this.logger.log(`Generando documento para actividad: ${a.ClaveActividad}`);
-
-      const files = await this.activitiesService.getDocumentsByActivity(a.ClaveActividad);
-
-      for (const f of files) {
-        const claveDepartamento = f.departamento ?? await this.getDepartmentId(claveDocente);
-        const año = new Date().getFullYear();
-        const generator = generationMethods[f.documento];
-        if (generator) {
-          await generator(
-            claveDocente,
-            año,
-            claveDepartamento
-          )
-        }
-      }
-    }
+      return result.recordset.map(row => row.claveDocumento);
   }
 
-  // ========== MÉTODOS AUXILIARES ==========
   /**
    * Obtener clave de docente por clave de usuario
    * @param claveUsuario: string
@@ -131,7 +98,25 @@ export class FilesService {
         WHERE ClaveDepartamento = @ClaveDepartamento
       `)
 
-    return result.recordset[0] || null;
+    return result.recordset[0]?.nombreCompleto || null;
+  }
+
+  /**
+   * Obtener nombre de departamento por clave
+   * @param claveDepartamento: string
+   */
+  async getDepartmentNameById(claveDepartamento: string) {
+    const pool = this.mssql.getPool();
+    const result = await pool
+      .request()
+      .input('ClaveDepartamento', claveDepartamento)
+      .query(`
+        SELECT Nombre AS nombre
+        FROM Departamento
+        WHERE ClaveDepartamento = @ClaveDepartamento
+      `);
+
+    return result.recordset[0]?.nombre || null;
   }
 
   /**
@@ -149,7 +134,7 @@ export class FilesService {
         WHERE ClaveDocente = @ClaveDocente
       `);
 
-    return result.recordset[0]?.claveDepartamento ?? null;
+    return result.recordset[0]?.claveDepartamento || null;
   }
 
   /**
@@ -188,15 +173,73 @@ export class FilesService {
     return (result.length === 0 ? false : true);
   }
 
+  /**
+   * Obtener nombre de docente por clave
+   * @param claveDocente: string
+   */
+  async getProfessorNameById(claveDocente: string) {
+    const pool = this.mssql.getPool();
+    const result = await pool 
+      .request()
+      .input('ClaveDocente', claveDocente)
+      .query(`
+        SELECT
+          CONCAT(Nombre, ' ', ApellidoPaterno, ' ', ApellidoMaterno) AS nombreCompleto
+        FROM Docente
+        WHERE ClaveDocente = @ClaveDocente
+      `)
+
+    return result.recordset[0]?.nombreCompleto || null;
+  }
+
+  // ========== MÉTODOS POR DEPARTAMENTO ==========
+  /**
+   * Obtener documentos por departamento
+   * @param claveDepartamento: string
+   * @param año: number
+   * @param claveDocente: string
+   */
+  async getFilesByDepartment(claveDocente: string, claveDepartamento: string, año: number) {
+    const generationMethods = {
+      // mapear métodos de generación por documento
+    }
+
+    const base: DocumentInterfaces.Base = {
+        docente: await this.getProfessorNameById(claveDocente),
+        titular: await this.getDepartmentHeadById(claveDepartamento),
+        departamento: await this.getDepartmentNameById(claveDepartamento),
+      };
+
+    const files = await this.getDocumentsByDepartment(claveDepartamento);
+
+    for (const f of files) {
+      const generator = generationMethods[f.documento];
+
+      if (generator) {
+        await generator(
+          claveDocente,
+          año,
+          claveDepartamento
+        )
+      }
+    }
+  }
+
   // ========== MÉTODOS ESPECIFICOS POR DOCUMENTO ==========
   
   /**
    * DOC033: Comisión por asesoría en concursos
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC033(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateComisionAsesoriaConcursos(
+    base: DocumentInterfaces.Base,
+    claveDocente: string,
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.AsesoriaConcuros[]> {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento,
@@ -215,25 +258,35 @@ export class FilesService {
        {name: 'Año', value: año}]
     ) 
 
-    return (result.length === 0 ? null : {
-      asesoriasEventos: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+
+
+    return result.map(row => ({
+      ...base,
+      evento: row.nombreEvento,
+      fechaInicio: row.FechaInicio,
+      fechaFin: row.FechaFin
+    }));
   }
 
-    /**
+  /**
    * DOC034: Constancia por asesoría en concursos
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC034(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateConstanciaAsesoriaConcursos(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.AsesoriaConcuros[]> {
     const query = `
       SELECT 
-        e.NombreConcurso [NOMBRE_EVENTO], 
-        e.Ubicacion [UBICACION], 
-        ae.FechaInicio [FECHA_INICIO], 
-        ae.FechaFin [FECHA_FIN]
+        e.NombreConcurso as nombreEvento, 
+        e.Ubicacion as ubicacion, 
+        ae.FechaInicio as fechaInicio, 
+        ae.FechaFin as fechaFin
       FROM AsesoriaEvento ae
       INNER JOIN Evento e ON e.ClaveEvento = ae.ClaveEvento
       WHERE ae.ClaveDocente = @ClaveDocente
@@ -245,21 +298,32 @@ export class FilesService {
       query,
       [{name: 'ClaveDocente', value: claveDocente}, 
        {name: 'Año', value: año}]
-    ) 
+    )
+    const titular = await this.getDepartmentHeadById('DSUBD10'); 
 
-    return (result.length === 0 ? null : {
-      asesoriasEventos: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    return result.map(row => ({
+      ...base,
+      subdireccion: titular,
+      evento: row.nombreEvento,
+      ubicacion: row.ubicacion,
+      fechaInicio: row.fechaInicio,
+      fechaFin: row.fechaFin,
+    }));
   }
 
   /**
    * DOC035: Comisión por asesoría en proyectos premiados en concurso
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC035(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateComisionProyectosPremiados(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.AsesoriaConcuros[]> {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento, 
@@ -279,19 +343,27 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      proyectosPremiados: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    return result.map(row => ({
+      ...base,
+      evento: row.nombreEvento,
+      fechaInicio: row.fechaInicio,
+      fechaFin: row.fechaFin,
+    }));
   }
 
   /**
    * DOC036: Constancia por asesoría en proyectos premiados en concurso
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC036(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateConstanciaProyectosPremiados(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.AsesoriaConcuros[]> {
     const query = `
       SELECT 
         e.NombreConcurso AS nombreConcurso, 
@@ -311,19 +383,27 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      proyectosPremiados: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    return result.map(row => ({
+      ...base,
+      evento: row.nombreConcurso,
+      nombreProyecto: row.nombreProyecto,
+      lugarPremiado: row.lugarPremiado,
+    }));
   }
 
   /**
-   * DOC037: Comisión por coordinación en eventos
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * DOC037: Comisión por colaboración en eventos
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC037(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateComisionColaboracionEventos(
+    base: DocumentInterfaces.Base,
+    claveDocente: string,  
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.ColaboracionEventos[]> {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento,
@@ -342,19 +422,26 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      coordinacionEventos: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    return result.map(row => ({
+      ...base,
+      evento: row.nombreEvento,
+      fechaInicio: row.fechaInicio,
+      fechaFin: row.fechaFin,
+    }));
   }
 
   /**
-   * DOC038: Constancia por coordinación en eventos
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * DOC038: Constancia por colaboración en eventos
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC038(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateConstanciaColaboracionEventos(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.ColaboracionEventos[]> {
     const query = `
       SELECT 
         e.NombreConcurso AS nombreConcurso,
@@ -382,19 +469,32 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      coordinacionEventos: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    const titular = await this.getDepartmentHeadById('DSUBD10');
+
+    return result.map(row => ({
+      ...base,
+      subdireccion: titular,
+      evento: row.nombreConcurso,
+      funcion: row.funcion,
+      actividades: row.actividades,
+      fechaInicio: row.fechaInicio,
+      fechaFin: row.fechaFin,
+    }));
   }
 
   /**
    * DOC039: Comisión para participar como jurado en eventos
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC039(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateComisionJurado(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.JuradoEventos[]> {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento,
@@ -413,19 +513,27 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      juradoEventos: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    return result.map(row => ({
+      ...base,
+      evento: row.nombreEvento,
+      fechaInicio: row.fechaInicio,
+      ubicación: row.lugar,
+    }));
   }
 
   /**
    * DOC040: Constancia por participar como jurado en eventos
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC040(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateConstanciaJurado(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.JuradoEventos[]> {
     const query = `
       SELECT 
         e.NombreEvento AS nombreEvento,
@@ -443,26 +551,36 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      juradoEventos: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    const titular = await this.getDepartmentHeadById('DSUBD10');
+
+    return result.map(row => ({
+      ...base,
+      subdireccion: titular,
+      evento: row.nombreEvento,
+      categoria: row.categoria,
+    }));
   }
 
   /**
    * DOC041: Comisión para participar en comités de evaluación
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC041(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateComisionComites(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.ComitesEvaluacion[]> {
     const query = `
       SELECT
         CASE 
           WHEN ce.Tipo LIKE '%evaluación%'
           THEN 'EVALUACIÓN'
           ELSE 'ACREDITACIÓN'
-        END AS comité
+        END AS comite
         ce.Tipo AS tipo
         ce.Organismo AS organismo
       FROM ComiteEvaluador ce
@@ -477,19 +595,27 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      comites: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    return result.map(row => ({
+      ...base,
+      comite: row.comite,
+      tipo: row.tipo,
+      organismo: row.organismo,
+    }));
   }
 
   /**
    * DOC042: Constancia por participación en comités de evaluación
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC042(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateConstanciaComites(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.ComitesEvaluacion[]> {
     const query = `
       SELECT 
         ce.Tipo AS tipo,
@@ -506,19 +632,29 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      comites: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    const titular = await this.getDepartmentHeadById('DSUBD10');
+
+    return result.map(row => ({
+      ...base,
+      subdireccion: titular,
+      tipo: row.tipo,
+      organismo: row.organismo,
+    }));
   }
 
   /**
    * DOC043: Comisión para auditorías
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC043(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateComisionAuditorias(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number 
+  ): Promise<DocumentInterfaces.Auditorias[]> {
     const query = `
       SELECT a.TipoSistema AS tipoSistema
       FROM Auditoria a
@@ -533,19 +669,25 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      auditorias: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    return result.map(row => ({
+      ...base,
+      tipoSistema: row.tipoSistema,
+    }));
   }
 
   /**
    * DOC044: Constancia por auditorías
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC044(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateConstanciaAuditorias(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.Auditorias[]> {
     const query = `
       SELECT 
         a.FuncionDocente AS funcionDocente,
@@ -565,19 +707,32 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      auditorias: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    const titular = await this.getDepartmentHeadById('DSUBD10');
+
+    return result.map(row => ({
+      ...base,
+      funcion: row.funcionDocente,
+      tipoSistema: row.tipoSistema,
+      fechaInicio: row.fechaInicio,
+      fechaFin: row.fechaFin,
+      lugar: row.lugar,
+      subdireccion: titular,
+    }));
   }
 
   /**
    * DOC045: Comisión para elaboración de planes y programas
-   * @param claveDocente: string
-   * @param año: number
-   * @param claveDepartamento: string
+   * @param base DocumentInterfaces.Base
+   * @param claveDocente string
+   * @param claveDepartamento string
+   * @param año number
    */
-  async generateDOC045(claveDocente: string, año: number, claveDepartamento: string) {
+  async generateComisionPlanes(
+    base: DocumentInterfaces.Base,
+    claveDocente: string, 
+    claveDepartamento: string,
+    año: number
+  ): Promise<DocumentInterfaces.DesarrolloCurricular[]> {
     const query = `
       SELECT 
         ep.FechaInicio AS fechaInicio,
@@ -594,10 +749,11 @@ export class FilesService {
        {name: 'Año', value: año}]
     )
 
-    return (result.length === 0 ? null : {
-      planes: result,
-      titular: await this.getDepartmentHeadById(claveDepartamento)
-    });
+    return result.map(row => ({
+      ...base,
+      fechaInicio: row.fechaInicio,
+      fechaFin: row.fechaFin,
+    }));
   }
 
   /**
@@ -666,7 +822,7 @@ export class FilesService {
   
 
   /**
-   * DOC048: Comisión para la elaboración de módulos de especialidad
+   * DOC048 - Comisión para la elaboración de módulos de especialidad
    * @param claveDocente: string
    * @param año: number
    * @param claveDepartamento: string
@@ -680,7 +836,8 @@ export class FilesService {
       FROM ElaboracionModuloEspecialidad eme
       INNER JOIN Programa p ON p.ClavePrograma = eme.ClavePrograma
       WHERE eme.ClaveDocente = @ClaveDocente
-          AND YEAR(eme.FechaInicio) = @Año
+        AND eme.Nivel = 'LICENCIATURA'
+        AND YEAR(eme.FechaInicio) = @Año
     `
 
     const result = await this.dynamicDb.executeQueryByDepartmentId(
@@ -713,7 +870,8 @@ export class FilesService {
       WHERE eme.ClaveDocente = @ClaveDocente
         AND eme.Nivel = 'LICENCIATURA'
         AND YEAR(eme.FechaInicio) = @Año
-      GROUP BY p.NombrePrograma, 
+      GROUP BY 
+        p.NombrePrograma, 
         eme.ClaveDocente
     `
 
@@ -745,9 +903,10 @@ export class FilesService {
       INNER JOIN ListaModulo lm ON eme.ClaveRegistro = lm.ClaveRegistro
       INNER JOIN Programa p ON p.ClavePrograma = eme.ClavePrograma
       WHERE eme.ClaveDocente = (inputCLAVE)
-        AND eme.Nivel LIKE 'licenciatura'
+        AND eme.Nivel = 'LICENCIATURA'
         AND YEAR(eme.FechaInicio) = (inputAÑO)
-      GROUP BY p.NombrePrograma, 
+      GROUP BY 
+        p.NombrePrograma, 
         eme.ClaveDocente
     `
 
@@ -1085,35 +1244,23 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDOC061(claveDocente: string, año: number, claveDepartamento: string) {
-    const semesters = ['AGOSTO-DICIEMBRE', 'ENERO-JUNIO'];
-    const result: any[] = [];
+  async generateDOC061(claveDocente: string, año: number, claveDepartamento: string) {    
+    const query = `
+      SELECT 
+        Año AS año,
+        Semestre AS semestre,
+        Calificacion AS calificacion
+      FROM EvaluacionDepartamental
+      WHERE ClaveDocente = @ClaveDocente
+        AND Año = @Año
+    `
 
-    for (const s of semesters) {
-      if (await this.isPostgraduateOnly(claveDocente, año, s))
-          continue;
-      
-      const query = `
-        SELECT 
-          Año AS año,
-          Semestre AS semestre,
-          Calificacion AS calificacion
-        FROM EvaluacionDepartamental
-        WHERE ClaveDocente = @ClaveDocente
-          AND Año = @Año
-          AND Semestre = @Semestre
-      `
-
-      const r = await this.dynamicDb.executeQueryByDepartmentId(
-        claveDepartamento,
-        query,
-        [{name: 'ClaveDocente', value: claveDocente},
-        {name: 'Año', value: año},
-        {name: 'Semestre', value: s}]
-      )
-
-      if (r) result.push(r[0]);
-    }
+    const result = await this.dynamicDb.executeQueryByDepartmentId(
+      claveDepartamento,
+      query,
+      [{name: 'ClaveDocente', value: claveDocente},
+      {name: 'Año', value: año}]
+    )
 
     return (result.length === 0 ? null : {
       evaluaciones: result,
@@ -1127,35 +1274,24 @@ export class FilesService {
    * @param año: number
    * @param claveDepartamento: string
    */
-  async generateDOC062(claveDocente: string, año: number, claveDepartamento: string) {
-    const semesters = ['AGOSTO-DICIEMBRE', 'ENERO-JUNIO'];
-    const result: any[] = [];
+  async generateDOC062(claveDocente: string, año: number, claveDepartamento: string) {      
+    const query = `
+      SELECT 
+        Año AS año,
+        Semestre AS semestre,
+        Calificacion AS calificacion
+      FROM EvaluacionDepartamental
+      WHERE ClaveDocente = @ClaveDocente
+        AND Año = @Año
+        AND Semestre = @Semestre
+    `
 
-    for (const s of semesters) {
-      if (!(await this.isPostgraduateOnly(claveDocente, año, s)))
-          continue;
-      
-      const query = `
-        SELECT 
-          Año AS año,
-          Semestre AS semestre,
-          Calificacion AS calificacion
-        FROM EvaluacionDepartamental
-        WHERE ClaveDocente = @ClaveDocente
-          AND Año = @Año
-          AND Semestre = @Semestre
-      `
-
-      const r = await this.dynamicDb.executeQueryByDepartmentId(
-        claveDepartamento,
-        query,
-        [{name: 'ClaveDocente', value: claveDocente},
-        {name: 'Año', value: año},
-        {name: 'Semestre', value: s}]
-      )
-
-      if (r) result.push(r[0]);
-    }
+    const result = await this.dynamicDb.executeQueryByDepartmentId(
+      claveDepartamento,
+      query,
+      [{name: 'ClaveDocente', value: claveDocente},
+      {name: 'Año', value: año}]
+    )
 
     return (result.length === 0 ? null : {
       evaluaciones: result,
