@@ -3,10 +3,16 @@ import { MssqlService } from '@strongnguyen/nestjs-mssql';
 import { DynamicDatabaseService } from '../database/dynamic-database.service';
 import { FilesService } from "../files/files.service";
 
-interface Requisito {
+interface Requirement {
     name: string;
     value: boolean;
 }
+
+type Validation = (
+    claveDocente: string,
+    claveDepartamento: string,
+    año: number
+) => Promise<Requirement[]>;
 
 @Injectable()
 export class ValidationServices {
@@ -22,9 +28,10 @@ export class ValidationServices {
      */
     async requisitosIniciales(
         claveDocente: string
-    ): Promise<Requisito[]> {
-        const resultados: Requisito[] = [];
-        // implementación
+    ): Promise<Requirement[]> {
+        const resultados: Requirement[] = [];
+        
+        const validation: Record<string, Validation> = {};
 
         return resultados;
     }
@@ -37,10 +44,9 @@ export class ValidationServices {
      */
     async recursosHumanos(
         claveDocente: string,
+        claveDepartamento: string,
         año: number,
-    ): Promise<Record<string, boolean>[]> {
-        const results: Record<string, boolean>[] = [];
-        const claveDepartamento = ''; 
+    ): Promise<Requirement[]> {
 
         const nombramiento = await this.dynamicDatabaseService.executeQueryByDepartmentId(
             claveDepartamento,
@@ -73,15 +79,12 @@ export class ValidationServices {
              { name: 'Año', value: año }]
         )
 
-        results.push({
-            'Nombramiento tiempo completo (estatus 10 o 95)': 
-                (nombramiento[0]?.cargaHoraria === 'TIEMPO COMPLETO') && 
-                (nombramiento[0]?.estado === '10' || nombramiento[0]?.estado === '95'),
-            'Sin sanciones': sanciones[0]?.totalSanciones === 0,
-            'Asistencia >= 90%': (asistencia[0]?.asistencias) >= 0.9 * 170 // asumiendo 170 días laborables al año
-        });
-
-        return results;
+        return [
+            {name: 'Nombramiento tiempo completo (estatus 10 o 95)', value: (nombramiento[0]?.cargaHoraria === 'TIEMPO COMPLETO') && 
+                                                                            (nombramiento[0]?.estado === '10' || nombramiento[0]?.estado === '95')},
+            { name: 'Sin sanciones', value: sanciones[0]?.totalSanciones === 0},
+            { name: 'Asistencia >= 90%', value: (asistencia[0]?.asistencias) >= 0.9 * 170 } // asumiendo 170 días laborables al año
+        ];
     }
 
     /**
@@ -90,10 +93,10 @@ export class ValidationServices {
      */
     async cargaReglamentaria(
         claveDocente: string,
+        claveDepartamento: string,
         añoActual: number,
         añoEvaluar: number,
-    ): Promise<Requisito> {
-        const claveDepartamento = '';
+    ): Promise<Requirement[]> {
 
         const carga = await this.dynamicDatabaseService.executeQueryByDepartmentId(
             claveDepartamento,
@@ -121,24 +124,24 @@ export class ValidationServices {
             `
         )
 
-        const proyecto = await this.proyectoInvestigacion(claveDocente);
+        const proyecto = await this.proyectoInvestigacion(claveDocente, 'DDIRD09');
 
-        return {
+        return [{
             name: 'Carga académica reglamentaria cumplida', 
             value: (carga[0]?.total >= 40 && 
                     carga[1]?.total >= 40 && 
-                    carga[2]?.total >= 40) || proyecto.value
-        };
+                    carga[2]?.total >= 40) || proyecto[0].value
+        }];
     }
 
     /**
-     * El personal docente con plaza de profesor investigador, debe presentar un proyecto de investigación vigente 
+     *  El personal docente con plaza de profesor investigador, debe presentar un proyecto de investigación vigente 
      *  registrado ante la DDIE del TecNM.  
      */
     async proyectoInvestigacion(
         claveDocente: string,
-    ): Promise<Requisito> {
-        const claveDepartamento = '';
+        claveDepartamento: string
+    ): Promise<Requirement[]> {
 
         const docenteInvestigador = await this.dynamicDatabaseService.executeQueryByDepartmentId(
             claveDepartamento,
@@ -161,11 +164,13 @@ export class ValidationServices {
             [{ name: 'ClaveDocente', value: claveDocente }]
         )
 
-        return (docenteInvestigador[0]?.categoria === undefined 
+        return ([
+            docenteInvestigador[0]?.categoria === undefined 
             ? (proyecto.length > 0)
                 ? { name: 'Proyecto de investigación vigente', value: true }
                 : { name: 'No aplica proyecto de investigación', value: true } 
-            : { name: 'Proyecto de investigación vigente', value: proyecto.length > 0 })
+            : { name: 'Proyecto de investigación vigente', value: proyecto.length > 0 }
+        ]);
     }
 
     /**
@@ -175,9 +180,9 @@ export class ValidationServices {
      *  impreso o en electrónico. 
      */
     async curriculumVitae(
-        claveDocente: string
-    ): Promise<Requisito> {
-        const claveDepartamento = '';
+        claveDocente: string,
+        claveDepartamento: string
+    ): Promise<Requirement[]> {
 
         const curriculum = await this.dynamicDatabaseService.executeQueryByDepartmentId(
             claveDepartamento,
@@ -190,16 +195,118 @@ export class ValidationServices {
             [{ name: 'ClaveDocente', value: claveDocente }]
         )
 
-        return {
+        return [{
             name: 'Currículum vitae actualizado', 
             value: curriculum.length > 0
-        }
+        }];
     }
 
     /**
-     * Constancia emitida por la persona titular del Departamento de Servicios Escolares que indique por semestre, 
-     *   el nivel, el nombre y la clave de las asignaturas que impartió, así como la cantidad de estudiantes atendidos 
-     *   en cada grupo durante el periodo a evaluar (2024). No se deben considerar asignaturas impartidas en cursos 
-     *   de verano. 
+     *  Constancia emitida por la persona titular del Departamento de Servicios Escolares que indique por semestre, 
+     *  el nivel, el nombre y la clave de las asignaturas que impartió, así como la cantidad de estudiantes atendidos 
+     *  en cada grupo durante el periodo a evaluar.
      */
+    
+    /**
+     *  * Constancias de cumplimiento de las actividades docentes encomendadas en tiempo y forma mediante el
+     *  formato de liberación de actividades, de los dos semestres del periodo a evaluar.
+     *  Donde se especifique que el personal docente está LIBERADO(A).
+     * 
+     *  * Carta de liberación de actividades académicas debidamente requisitada, donde se indique que las 
+     *  actividades encomendadas fueron cumplidas al 100%.
+     */
+    async actividadesDocentes(
+        claveDocente: string,
+        claveDepartamento: string,
+        año: number
+    ): Promise<Requirement[]> {
+
+        const actividades = await this.dynamicDatabaseService.executeQueryByDepartmentId(
+            claveDepartamento,
+            `SELECT 
+                Año as año,
+                Semestre as semestre,
+                CASE 
+                WHEN COUNT(*) = SUM(Estado)
+                    THEN 'LIBERADO'
+                    ELSE 'NO LIBERADO'
+                END AS estado
+            FROM Asignatura_Docente
+            WHERE ClaveDocente = @ClaveDocente
+                AND Año = @Año
+            GROUP BY 
+                Año,
+                Semestre`,
+            [{ name: 'ClaveDocente', value: claveDocente },
+             { name: 'Año', value: año }]
+        )
+
+        return [{
+            name: 'Actividades docentes liberadas en tiempo y forma', 
+            value: actividades.length === 2 && actividades.every(act => act.estado === 'LIBERADO')
+        }];
+    }
+
+    /**
+     *  Evaluaciones departamentales del periodo a evaluar con una calificación global mínima de SUFICIENTE. 
+     *  Para el caso de personal docente que únicamente atendió grupos de Posgrado deberá presentar una evaluación 
+     *  instrumentada por la propia institución con una calificación global mínima de SUFICIENTE.
+     */
+    async evaluacionesDepartamentales(
+        claveDocente: string,
+        claveDepartamento: string,
+        año: number,
+    ): Promise<Requirement[]> {
+
+        const evaluaciones = await this.dynamicDatabaseService.executeQueryByDepartmentId(
+            claveDepartamento,
+            `SELECT 
+                Año AS año,
+                Semestre AS semestre,
+                Calificacion AS calificacion
+            FROM EvaluacionDepartamental
+            WHERE ClaveDocente = @ClaveDocente
+                AND Año = @Año
+                AND Calificacion IN ('SUFICIENTE', 'BUENA', 'SOBRESALIENTE', 'EXCELENTE')`,
+            [{ name: 'ClaveDocente', value: claveDocente },
+             { name: 'Año', value: año }]
+        )
+
+        return [{
+            name: 'Evaluaciones departamentales con calificación mínima de SUFICIENTE',
+            value: evaluaciones.length === 2
+        }];
+    }
+
+    /**
+     *  Dos evaluaciones del desempeño frente a grupo del periodo a evaluar con una calificación mínima de
+     *  SUFICIENTE, las cuales deberán corresponder a la evaluación de al menos el 60% del estudiantado atendido
+     *  por el personal docente participante (el porcentaje no aplica para grupos de posgrado)
+     */
+    async evaluacionesGrupo(
+        claveDocente: string,
+        claveDepartamento: string,
+        año: number,
+    ): Promise<Requirement[]> {
+
+        const evaluaciones = await this.dynamicDatabaseService.executeQueryByDepartmentId(
+            claveDepartamento,
+            `SELECT
+                Año AS año,
+                Semestre AS semestre,
+                PorcentajeEstudiantado AS porcentajeEstudiantado
+            FROM EvaluacionDesempeño
+            WHERE ClaveDocente = @ClaveDocente
+                AND Año = @Año
+                AND PorcentajeEstudiantado >= 60
+                AND Calificacion IN ('SUFICIENTE', 'BUENA', 'SOBRESALIENTE', 'EXCELENTE')`,
+            [{ name: 'ClaveDocente', value: claveDocente },
+             { name: 'Año', value: año }]
+        )
+
+        return [{
+            name: 'Evaluaciones frente a grupo con calificación mínima de SUFICIENTE',
+            value: evaluaciones.length === 2
+        }];
+    }
 }

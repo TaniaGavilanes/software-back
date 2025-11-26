@@ -3,21 +3,21 @@ import { MssqlService } from '@strongnguyen/nestjs-mssql';
 import { DynamicDatabaseService } from '../database/dynamic-database.service';
 import { UsersService } from '../users/users.service';
 import { ActivitiesService } from '../activities/activities.service';
-import * as DocumentInterfaces from './interfaces/files.interface';
+import * as FileInterfaces from './interfaces/files.interface';
 
 interface Expediente {
   claveExpediente: string;
   añoGeneracion: number;
   claveDocente: string;
-  documentos: DocumentInterfaces.DocumentoGenerado[];
+  documentos: FileInterfaces.GeneratedFile[];
 }
 
-type GeneratorFunction = (
-    base: DocumentInterfaces.Base,
+type Generator = (
+    base: FileInterfaces.Base,
     claveDocente: string,
     claveDepartamento: string,
     año: number
-) => Promise<DocumentInterfaces.DocumentoGenerado[]>;
+) => Promise<FileInterfaces.GeneratedFile[]>;
 
 @Injectable()
 export class FilesService {
@@ -30,7 +30,9 @@ export class FilesService {
     private readonly activitiesService: ActivitiesService,
   ) {}
 
-  async generateFiles(claveUsuario: string) {
+  async generateFiles(
+    claveUsuario: string
+  ): Promise<FileInterfaces.GeneratedFile[]> {
     try {
       this.logger.log(`Iniciando generación de archivos para usuario: ${claveUsuario}`);
       
@@ -39,11 +41,16 @@ export class FilesService {
       if (!user) {
         throw new NotFoundException(`Usuario con clave ${claveUsuario} no encontrado`);
       }
-
       this.logger.log(`Usuario encontrado: ${user.Correo}`);
+
+      const claveDocente = await this.getProfessorId(claveUsuario);
+      if (!claveDocente) {
+        throw new NotFoundException(`Docente con clave de usuario ${claveUsuario} no encontrado`);
+      }
+      this.logger.log(`Docente encontrado: ${claveDocente}`);
       
-      // Implementación pendiente
-      throw new Error('Método generateFiles no implementado');
+      const data = await this.generateExpediente(claveDocente);
+      return data.documentos;
 
     } catch (error) {
       this.logger.error(`Error en generateFiles: ${error.message}`, error.stack);
@@ -53,6 +60,7 @@ export class FilesService {
 
   /**
    * Generar expediente
+   * @param claveDocente string
    */
   async generateExpediente(
     claveDocente: string
@@ -63,11 +71,11 @@ export class FilesService {
 
     await this.deleteExpedienteIfExists(claveExpediente);
 
-    let claveDepartamento;
+    let claveDepartamento: string;
     let base;
-    let documentos: DocumentInterfaces.DocumentoGenerado[] = [];
+    let documentos: FileInterfaces.GeneratedFile[] = [];
 
-    const generation: Record<string, GeneratorFunction> = {
+    const generation: Record<string, Generator> = {
       // DOC033: Comisión por asesoría en concursos
       'DOC033': () => 
         this.generateAsesoriaConcursos(base, claveDocente, claveDepartamento, año, 
@@ -202,7 +210,7 @@ export class FilesService {
     const departamentos = await this.getAllDepartmentIds();
     
     for (const dep of departamentos) {
-      const claveDepartamento = dep ?? (await this.getDepartmentByProfessorId(claveDocente));
+      claveDepartamento = dep ?? (await this.getDepartmentByProfessorId(claveDocente));
       const result = await this.getFilesByDepartment(claveDocente, claveDepartamento, año, generation);
 
       if (result && result.length > 0) {
@@ -218,6 +226,7 @@ export class FilesService {
       documentos: documentos
     }
 
+    await this.insertExpediente(expediente);
     await this.insertGeneratedDocuments(documentos, claveExpediente);
     
     return expediente;
@@ -233,17 +242,17 @@ export class FilesService {
     claveDocente: string, 
     claveDepartamento: string, 
     año: number, 
-    generation: Record<string, GeneratorFunction>
-    ): Promise<DocumentInterfaces.DocumentoGenerado[]> {
+    generation: Record<string, Generator>
+    ): Promise<FileInterfaces.GeneratedFile[]> {
 
-    const base: DocumentInterfaces.Base = {
+    const base: FileInterfaces.Base = {
         docente: await this.getProfessorNameById(claveDocente),
         titular: await this.getDepartmentHeadById(claveDepartamento),
         departamento: await this.getDepartmentNameById(claveDepartamento),
       };
 
     const files = await this.getDocumentsByDepartment(claveDepartamento);
-    const docs: DocumentInterfaces.DocumentoGenerado[] = [];
+    const docs: FileInterfaces.GeneratedFile[] = [];
 
     for (const f of files) {
       const result = await generation[f.documento]?.(base, claveDocente, claveDepartamento, año);
@@ -257,13 +266,30 @@ export class FilesService {
 
   // ========== MÉTODOS AUXILIARES ==========
   /**
+   * Insertar expediente en la base de datos
+   * @param expediente Expediente
+   */
+  async insertExpediente(expediente: Expediente) {
+    const pool = this.mssql.getPool();
+    await pool
+      .request()
+      .input('ClaveExpediente', expediente.claveExpediente)
+      .input('AñoGeneracion', expediente.añoGeneracion)
+      .input('ClaveDocente', expediente.claveDocente)
+      .query(`
+        INSERT INTO Expediente (ClaveExpediente, AñoGeneracion, ClaveDocente)
+        VALUES (@ClaveExpediente, @AñoGeneracion, @ClaveDocente)
+      `);
+  }
+
+  /**
    * Insertar documentos generados a tabla correspondiente
    * @param documentos DocumentInterfaces.DocumentoGenerado[]
    * @claveExpediente string
    * @claveDocente string
    */
   async insertGeneratedDocuments(
-    documentos: DocumentInterfaces.DocumentoGenerado[],
+    documentos: FileInterfaces.GeneratedFile[],
     claveExpediente: string,
   ) {
     const pool = this.mssql.getPool();
@@ -440,7 +466,7 @@ export class FilesService {
    * @param options tipoDocumento | proyectorPremiado
    */
   async generateAsesoriaConcursos(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string,
     claveDepartamento: string,
     año: number,
@@ -448,7 +474,7 @@ export class FilesService {
       tipo: 'comision' | 'constancia',
       premiado: boolean
     }
-  ): Promise<DocumentInterfaces.AsesoriaConcuros[]> {
+  ): Promise<FileInterfaces.AsesoriaConcuros[]> {
     // Consulta dependerá de las opciones
     let query = (
       options.premiado 
@@ -523,12 +549,12 @@ export class FilesService {
    * @param año number
    */
   async generateColaboracionEventos(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string,  
     claveDepartamento: string,
     año: number,
     tipo: 'comision' | 'constancia'
-  ): Promise<DocumentInterfaces.ColaboracionEventos[]> {
+  ): Promise<FileInterfaces.ColaboracionEventos[]> {
     let query = (
       tipo === 'comision'
       ?  `SELECT 
@@ -588,12 +614,12 @@ export class FilesService {
    * @param año number
    */
   async generateJuradoEventos(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string,
     año: number,
     tipo: 'comision' | 'constancia'
-  ): Promise<DocumentInterfaces.JuradoEventos[]> {
+  ): Promise<FileInterfaces.JuradoEventos[]> {
     let query = (
       tipo === 'comision'
       ?  `SELECT 
@@ -642,12 +668,12 @@ export class FilesService {
    * @param año number
    */
   async generateComitesEvaluacion(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string,
     año: number,
     tipo: 'comision' | 'constancia'
-  ): Promise<DocumentInterfaces.ComitesEvaluacion[]> {
+  ): Promise<FileInterfaces.ComitesEvaluacion[]> {
     let query = (
       tipo === 'comision'
       ?  `SELECT
@@ -697,12 +723,12 @@ export class FilesService {
    * @param año number
    */
   async generateAuditorias(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string,
     año: number,
     tipo: 'comision' | 'constancia'
-  ): Promise<DocumentInterfaces.Auditorias[]> {
+  ): Promise<FileInterfaces.Auditorias[]> {
     let query = (
       tipo === 'comision'
       ?  `SELECT a.TipoSistema AS tipoSistema
@@ -750,7 +776,7 @@ export class FilesService {
    * @param año number
    */
   async generateElaboracionPlanes(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string,
     año: number,
@@ -758,7 +784,7 @@ export class FilesService {
       tipo: 'comision' | 'constancia'
       nivel: 'local' | 'nacional' | 'null'
     }
-  ): Promise<DocumentInterfaces.DesarrolloCurricular[]> {
+  ): Promise<FileInterfaces.DesarrolloCurricular[]> {
     let query = (
       option.tipo === 'comision'
       ?  `SELECT 
@@ -802,12 +828,12 @@ export class FilesService {
    * @param año number
    */
   async generateElaboracionModulos(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string,
     año: number,
     tipo : 'comision' | 'constancia' | 'registro'
-  ): Promise<DocumentInterfaces.DesarrolloCurricular[]> {
+  ): Promise<FileInterfaces.DesarrolloCurricular[]> {
     let query =(
       tipo === 'comision'
       ?  `SELECT 
@@ -862,12 +888,12 @@ export class FilesService {
    * @param año number
    */
   async generateAperturaProgramas(
-    base: DocumentInterfaces.Base, 
+    base: FileInterfaces.Base, 
     claveDocente: string, 
     claveDepartamento: string,
     año: number,
     tipo: 'comision' | 'constancia' | 'autorizacion'
-  ): Promise<DocumentInterfaces.DesarrolloCurricular[]> {
+  ): Promise<FileInterfaces.DesarrolloCurricular[]> {
     let query = (
       tipo === 'comision'
       ?  `SELECT 
@@ -937,10 +963,10 @@ export class FilesService {
    * @param claveDepartamento: string
    */
   async generatePrestacionServicios(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string
-  ): Promise<DocumentInterfaces.PrestacionServicios[]> {
+  ): Promise<FileInterfaces.PrestacionServicios[]> {
     let query = `
       SELECT 
         d.RFC AS rfc,
@@ -979,11 +1005,11 @@ export class FilesService {
    * @param claveDepartamento: string
    */
   async generateProyectoInvestigacion(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string,
     año: number
-  ): Promise<DocumentInterfaces.ProyectoInvestigacion[]> {
+  ): Promise<FileInterfaces.ProyectoInvestigacion[]> {
     const query = `
       SELECT 
         pi.NombreProyecto AS nombreProyecto,
@@ -1016,10 +1042,10 @@ export class FilesService {
    * @param claveDepartamento: string
    */
   async generateCurriculumVitae(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string
-  ): Promise<DocumentInterfaces.CurriculumVitae[]> {
+  ): Promise<FileInterfaces.CurriculumVitae[]> {
     const query = `
       SELECT
         d.CVUEstado AS estado
@@ -1046,11 +1072,11 @@ export class FilesService {
    * @param claveDepartamento: string
    */
   async generateLicenciasEspeciales(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string,
     año: number
-  ): Promise<DocumentInterfaces.LicenciasEspeciales[]> {
+  ): Promise<FileInterfaces.LicenciasEspeciales[]> {
     const query = `
       SELECT 
         le.TipoLicencia AS tipoLicencia,
@@ -1086,12 +1112,12 @@ export class FilesService {
    * @param claveDepartamento: string
    */
   async generateCumplimientoActividades(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string, 
     claveDepartamento: string,
     año: number,
     tipo : 'semestre' | 'anual'
-  ): Promise<DocumentInterfaces.CumplimientoActividades[]> {
+  ): Promise<FileInterfaces.CumplimientoActividades[]> {
     let query = (
       tipo === 'semestre'
       ?  `SELECT 
@@ -1143,12 +1169,12 @@ export class FilesService {
    * @param claveDepartamento: string
    */
   async generateEvaluaciones(
-    base: DocumentInterfaces.Base,
+    base: FileInterfaces.Base,
     claveDocente: string,
     claveDepartamento: string,
     año: number,
     tipo: 'departamental' | 'desempeño'
-  ): Promise<DocumentInterfaces.Evaluaciones[]> {    
+  ): Promise<FileInterfaces.Evaluaciones[]> {    
     let query = (
       tipo === 'departamental'
       ?  `SELECT 
@@ -1161,7 +1187,8 @@ export class FilesService {
       :  `SELECT 
             Año AS año,
             Semestre AS semestre,
-            porcentajeEstudiantado AS porcentajeEstudiantado
+            Calificacion AS calificacion,
+            PorcentajeEstudiantado AS porcentajeEstudiantado
           FROM EvaluacionDesempeño
           WHERE ClaveDocente = @ClaveDocente
             AND Año = @Año`
@@ -1174,10 +1201,13 @@ export class FilesService {
       {name: 'Año', value: año}]
     )
 
+    const subdireccion = await this.getDepartmentHeadById('DSUBD10');
+
     return result.map(row => ({
       ...base,
       año: row.año,
       semestre: row.semestre,
+      subdireccion: subdireccion || null,
       calificacion: row?.calificacion ?? null,
       porcentajeEstudiantado: row?.porcentajeEstudiantado ?? null,
     }));

@@ -163,7 +163,7 @@ export interface Evaluaciones extends Base {
     porcentajeEstudiantado?: number | null;
 }
 
-export type DocumentoGenerado = 
+export type GeneratedFile = 
     | AsesoriaConcuros
     | ColaboracionEventos
     | JuradoEventos
