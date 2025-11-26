@@ -2,6 +2,7 @@ export interface Base {
     docente: string;
     titular: string;
     departamento: string;
+    claveDepartamento: string;
     subdireccion?: string;
     claveDocumento?: string;
 }

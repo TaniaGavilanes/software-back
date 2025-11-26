@@ -249,6 +249,7 @@ export class FilesService {
         docente: await this.getProfessorNameById(claveDocente),
         titular: await this.getDepartmentHeadById(claveDepartamento),
         departamento: await this.getDepartmentNameById(claveDepartamento),
+        claveDepartamento: claveDepartamento,
       };
 
     const files = await this.getDocumentsByDepartment(claveDepartamento);
@@ -454,6 +455,22 @@ export class FilesService {
 
     return result.recordset[0]?.nombreCompleto || null;
   }
+
+  /**
+   * Obtener nombre de documento por clave
+   * @param claveDocumento: string
+   */
+  async getDocumentNameById(claveDocumento: string) {
+    const pool = this.mssql.getPool();
+    const result = await pool
+      .request()
+      .input('ClaveDocumento', claveDocumento)
+      .query(`SELECT Nombre AS nombre 
+              FROM Documento 
+              WHERE ClaveDocumento = @ClaveDocumento`)
+        
+      return result.recordset[0]?.nombre || null;
+    }
 
   // ========== MÉTODOS ESPECIFICOS POR DOCUMENTO ==========
   

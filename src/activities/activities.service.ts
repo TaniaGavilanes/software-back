@@ -26,6 +26,19 @@ export class ActivitiesService {
         return result.recordset || null;
     }
 
+    async getActivityByDocumentId(claveDocumento: string) {
+        const pool = this.mssql.getPool();
+        const result = await pool
+            .request()
+            .input('ClaveDocumento', claveDocumento)
+            .query(`SELECT a.Nombre AS nombreActividad
+                    FROM Actividad_Documento ad
+                    INNER JOIN Actividad a ON ad.ClaveActividad = a.ClaveActividad
+                    WHERE ClaveDocumento = @ClaveDocumento`);
+
+        return result.recordset?.[0].nombreActividad || null;
+    }
+
     async getDocumentsByActivity(claveActividad: string)  {
         const pool = this.mssql.getPool();
         const result = await pool

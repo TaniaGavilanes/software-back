@@ -48,7 +48,7 @@ export class TicketsController {
     }
   }
 
-    // Actualizar ticket (agregar resolución)
+  // Actualizar ticket (agregar resolución)
   @Patch(':claveTicket')
   async updateTicket(
     @Param('claveTicket') claveTicket: string,
