@@ -46,18 +46,6 @@ export class AuthController {
     return res.status(200).json(result);
   }
 
-  @Post('logout')
-  @HttpCode(HttpStatus.OK)
-  async logout(@Request() req) {
-    // En una implementación real, podrías invalidar el token aquí
-    // Por ejemplo, agregándolo a una lista negra en Redis
-    return {
-      success: true,
-      statusCode: 200,
-      message: 'Logged out successfully',
-    };
-  }
-
   @Get('profile')
   async getProfile(@Request() req) {
     return {
