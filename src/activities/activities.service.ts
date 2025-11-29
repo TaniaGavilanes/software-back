@@ -44,7 +44,10 @@ export class ActivitiesService {
         const result = await pool
             .request()
             .input('ClaveActividad', claveActividad)
-            .query(`SELECT * FROM Actividad_Documento WHERE ClaveActividad = @ClaveActividad`);  
+            .query(`SELECT DISTINCT
+                        ClaveDocumento,
+                        ClaveDepartamento 
+                    FROM Actividad_Documento WHERE ClaveActividad = @ClaveActividad`);  
             
         return result.recordset.map(row => ({
             documento: row.ClaveDocumento,
