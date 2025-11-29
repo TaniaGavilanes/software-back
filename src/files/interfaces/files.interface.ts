@@ -1,10 +1,222 @@
+export type Docente = {
+    nombreCompleto: string;
+    clave: string;
+    nombramiento: string;
+    fechaIngreso: Date;
+    fechaIngresoSEP: Date;
+    plaza: string;
+    clavePresupuestal: string;
+}
+
 export interface Base {
-    docente: string;
+    docente: Docente;
     titular: string;
     departamento: string;
     claveDepartamento: string;
     subdireccion?: string;
     claveDocumento?: string;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC001 - Horarios de asignaturas de licenciatura
+ *  * DOC003 - Horarios de asignatura adicional
+ *  * DOC005 - Horarios de asignaturas posgrado
+ */
+export interface Horarios extends Base {
+    periodo: string | null;
+    asignaturas: AsignaturaDetalle[] | null;
+    totalHoras: number | null;
+}
+
+interface AsignaturaDetalle {
+    asignatura: string | null;
+    claveAsignatura: string | null;
+    grupo: string | null;
+    estudiantes: number | null;
+    aula: string | null;
+    nivel: string | null;
+    modalidad: string | null;
+    carrera: string | null;
+    horario: string[] | null;
+    horasSemanales: number | null;
+    periodo: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC002 - Constancia de asignaturas impartidas
+ *  * DOC004 - Constancia de séptima asignatura
+ *  * DOC006 - Constancia de asignaturas posgrado
+ */
+export interface ConstanciaAsignaturas extends Base {
+    expediente: string | null;
+    periodo: string | null;
+    año: number | null;
+    asignaturas: AsignaturaDetalle[] | null;
+    totalEstudiantes: number | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC008 - Constancia de tutorías PIT
+ */
+export interface Tutorias extends Base {
+    tutorias: TutoriasDetalle[] | null;
+    totalTutorados: number | null;
+}
+
+interface TutoriasDetalle {
+    periodo: string | null;
+    año: number | null;
+    tutorados: number | null;
+    carrera: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC009 - Constancia de acreditación de programa
+ */
+export interface AcreditacionPrograma {
+    nombrePrograma: string | null;
+    organismoAcreditador: string | null;
+    fechaAcreditacion: Date | null;
+    fechaVencimiento: Date | null;
+    snp: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC010 - Constancia actividades complementarias
+ */
+export interface ActividadesComplementarias extends Base {
+    nombreActividad: string | null;
+    dictamen: string | null;
+    creditos: number | null;
+    estudiantes: number | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC011 - Constancia proyecto integrador
+ */
+export interface ProyectoIntegrador extends Base {
+    nombreProyecto: string | null;
+    asignaturas: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC012 - Constancia manual de prácticas
+ */
+export interface ManualPracticas extends Base {
+    nombreManual: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC013 - Constancia estrategias didácticas
+ */
+export interface EstrategiasDidacticas extends Base {
+    asignatura: string | null;
+    productos: string | null;
+    descripcionImpacto: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC014 - Constancia materiales didácticos inclusivos
+ */
+export interface MaterialesDidacticos extends Base {
+    enfoque: string | null;
+    productos: string | null;
+    descripcionImpacto: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC015 - Comisión por instructor de cursos para docentes
+ *  * DOC016 - Constancia por curso impartido
+ *  * DOC017 - Comisión por instructor de cursos TECNM
+ *  * DOC018 - Constancia por curso impartido TECNM
+ */
+export interface CursosImpartidos extends Base {
+    nombreCurso?: string | null;
+    tipoCurso?: string | null;
+    duracion?: number | null;
+    fechaInicio?: Date | null;
+    fechaFin?: Date | null;
+    numeroRegistro?: string | null;
+    totalDocentes?: number | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC019 - Comisión por diplomado pensamiento crítico
+ *  * DOC020 - Constancia diplomado pensamiento crítico
+ *  * DOC021 - Constancia diplomado formación de tutores
+ *  * DOC022 - Oficio diplomado recursos educativos
+ *  * DOC023 - Constancia diplomado recursos educativos
+ *  * DOC024 - Comisión diplomado educación inclusiva
+ *  * DOC025 - Constancia diplomado educación inclusiva
+ *  * DOC026 - Comisión diplomados estratégicos
+ *  * DOC027 - Constancia diplomados estratégicos
+ */
+export interface Diplomados extends Base {
+    nombreDiplomado?: string | null;
+    nombreModulo?: string | null;
+    duracionHoras?: number | null;
+    nombreProyectoEstrategico?: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC028 - Acta examen profesional/grado
+ *  * DOC030 - Constancia sinodal titulación
+ */
+
+export type Alumno = {
+    nombreCompleto: string;
+    numeroControl: string;
+}
+
+export interface Titulacion extends Base {
+    alumno: Alumno;
+    modalidadTitulacion?: string | null;
+    fechaExamen?: Date | null;
+    programaEducativo?: string | null;
+    rolDocente?: string | null;
+    folioActa?: string | null;
+    nivel?: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC029 - Convenio de colaboración académica
+ */
+export interface ConvenioColaboracion extends Base {
+    institucion1?: string | null;
+    institucion2?: string | null;
+    tipoConvenio?: string | null;
+    rolDocente?: string | null;
+}
+
+/**
+ * Interfaz para:
+ *  * DOC031 - Programa de asesorías en ciencias básicas
+ *  * DOC032 - Constancia por asesoría en ciencias básicas
+ */
+export interface AsesoriaCienciasBasicas extends Base {
+    totalHoras?: number | null;
+    asesorias?: AsesoriaDetalle[] | null;
+}
+
+interface AsesoriaDetalle {
+    horaio?: string | null;
+    asignatura?: string | null;
+    modalidad?: string | null;
+    estudiantes?: number | null;
+    periodo?: string | null;
 }
 
 /**
